@@ -38,8 +38,12 @@ def get_queue_status():
     
     conn.close()
     
+    # Convert is_active from integer to boolean for consistency
+    periode_data = dict(active_periode)
+    periode_data["is_active"] = bool(periode_data["is_active"])
+    
     return {
-        "periode": dict(active_periode),
+        "periode": periode_data,
         "queue_settings": settings,
         "current_serving": dict(current_serving) if current_serving else None,
         "statistics": {
@@ -212,7 +216,7 @@ def handle_back_queue():
     
     if not current_serving:
         conn.close()
-        return {"error": "No current serving to go back"}
+        raise HTTPException(status_code=400, detail="No current serving to go back")
     
     cursor.execute("UPDATE warga SET status = 'waiting' WHERE id = ?", (current_serving["id"],))
     

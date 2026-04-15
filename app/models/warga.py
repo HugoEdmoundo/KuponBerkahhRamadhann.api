@@ -5,7 +5,7 @@ from datetime import datetime
 class WargaBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     kk_number: str = Field(..., min_length=16, max_length=16)
-    rt_rw: str = Field(..., min_length=1, max_length=50)
+    rt_rw: str = Field(..., min_length=1, max_length=50, pattern=r'^\d{3}:\d{3}$')
     periode_id: str
 
 class WargaCreate(WargaBase):
@@ -14,7 +14,7 @@ class WargaCreate(WargaBase):
 class WargaUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     kk_number: Optional[str] = Field(None, min_length=16, max_length=16)
-    rt_rw: Optional[str] = Field(None, min_length=1, max_length=50)
+    rt_rw: Optional[str] = Field(None, min_length=1, max_length=50, pattern=r'^\d{3}:\d{3}$')
     status: Optional[str] = Field(None, pattern=r'^(waiting|serving|served|pending)$')
 
 class WargaResponse(BaseModel):
