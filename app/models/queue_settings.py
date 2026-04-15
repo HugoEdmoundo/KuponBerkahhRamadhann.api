@@ -1,24 +1,37 @@
-from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKey
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
-import uuid
+from pydantic import BaseModel, Field
+from typing import Optional
+from datetime import datetime
 
-from ..database import Base
+class QueueSettingsBase(BaseModel):
+    current_queue_number: int = Field(0, ge=0)
+    current_referral_code: str = Field("", max_length=10)
+    next_queue_counter: int = Field(1, ge=1)
+    periode_id: str
 
+class QueueSettingsCreate(QueueSettingsBase):
+    pass
 
-class QueueSettings(Base):
-    __tablename__ = "queue_settings"
+class QueueSettingsUpdate(BaseModel):
+    current_queue_number: Optional[int] = Field(None, ge=0)
+    current_referral_code: Optional[str] = Field(None, max_length=10)
+    next_queue_counter: Optional[int] = Field(None, ge=1)
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    current_queue_number = Column(Integer, default=0)
-    current_referral_code = Column(Text, default='')
-    next_queue_counter = Column(Integer, default=1)
-    periode_id = Column(String, ForeignKey('periodes.id'), nullable=False)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+class QueueSettingsResponse(QueueSettingsBase):
+    id: str
+    created_at: str
+    updated_at: str
+    
+    class Config:
+        from_attributes = True
 
-    # Relationships
-    periode = relationship("Periode", back_populates="queue_settings")
-
-    def __repr__(self):
-        return f"<QueueSettings(id={self.id}, current_queue={self.current_queue_number}, next_counter={self.next_queue_counter})>"
+class QueueSettings(BaseModel):
+    id: str
+    current_queue_number: int
+    current_referral_code: str
+    next_queue_counter: int
+    periode_id: str
+    created_at: str
+    updated_at: str
+    
+    class Config:
+        from_attributes = True

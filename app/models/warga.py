@@ -1,27 +1,48 @@
-from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKey
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
-import uuid
+from pydantic import BaseModel, Field
+from typing import Optional
+from datetime import datetime
 
-from ..database import Base
+class WargaBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    kk_number: str = Field(..., min_length=16, max_length=16)
+    rt_rw: str = Field(..., min_length=1, max_length=50)
+    periode_id: str
 
+class WargaCreate(WargaBase):
+    pass
 
-class Warga(Base):
-    __tablename__ = "warga"
+class WargaUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    kk_number: Optional[str] = Field(None, min_length=16, max_length=16)
+    rt_rw: Optional[str] = Field(None, min_length=1, max_length=50)
+    status: Optional[str] = Field(None, pattern=r'^(waiting|serving|served|pending)$')
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = Column(Text, nullable=False)
-    kk_number = Column(Text, nullable=False)
-    rt_rw = Column(Text, nullable=False)
-    referral_code = Column(Text, nullable=False, unique=True)
-    queue_number = Column(Integer, nullable=False)
-    status = Column(Text, nullable=False, default='waiting')  # waiting, serving, served, pending
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-    periode_id = Column(String, ForeignKey('periodes.id'), nullable=False)
+class WargaResponse(BaseModel):
+    id: str
+    name: str
+    kk_number: str
+    rt_rw: str
+    referral_code: str
+    queue_number: int
+    status: str
+    created_at: str
+    updated_at: str
+    periode_id: str
+    
+    class Config:
+        from_attributes = True
 
-    # Relationships
-    periode = relationship("Periode", back_populates="warga")
-
-    def __repr__(self):
-        return f"<Warga(id={self.id}, name={self.name}, queue_number={self.queue_number}, status={self.status})>"
+class Warga(BaseModel):
+    id: str
+    name: str
+    kk_number: str
+    rt_rw: str
+    referral_code: str
+    queue_number: int
+    status: str
+    created_at: str
+    updated_at: str
+    periode_id: str
+    
+    class Config:
+        from_attributes = True

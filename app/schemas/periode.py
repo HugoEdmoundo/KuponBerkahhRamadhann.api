@@ -1,26 +1,22 @@
-from pydantic import BaseModel, Field
-from datetime import datetime
+from pydantic import BaseModel
 from typing import Optional
-
+from datetime import datetime
 
 class PeriodeBase(BaseModel):
-    name: str = Field(..., min_length=1, description="Nama periode")
-    is_active: bool = Field(default=False, description="Status aktif periode")
-
+    name: str
+    is_active: bool = False
 
 class PeriodeCreate(PeriodeBase):
     pass
 
-
 class PeriodeUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, description="Nama periode")
-    is_active: Optional[bool] = Field(None, description="Status aktif periode")
-
+    name: Optional[str] = None
+    is_active: Optional[bool] = None
 
 class PeriodeResponse(PeriodeBase):
     id: str
-    created_at: datetime
-    updated_at: datetime
-
+    created_at: str
+    updated_at: str
+    
     class Config:
         from_attributes = True

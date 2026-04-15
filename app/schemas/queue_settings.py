@@ -1,29 +1,25 @@
 from pydantic import BaseModel, Field
-from datetime import datetime
 from typing import Optional
-
+from datetime import datetime
 
 class QueueSettingsBase(BaseModel):
-    current_queue_number: int = Field(default=0, description="Nomor antrian yang sedang dipanggil")
-    current_referral_code: str = Field(default="", description="Kode referral dari antrean yang sedang dipanggil")
-    next_queue_counter: int = Field(default=1, description="Nomor antrean berikutnya untuk pendaftaran baru")
-    periode_id: str = Field(..., description="ID periode terkait")
-
+    current_queue_number: int = Field(0, ge=0)
+    current_referral_code: str = Field("", max_length=10)
+    next_queue_counter: int = Field(1, ge=1)
+    periode_id: str
 
 class QueueSettingsCreate(QueueSettingsBase):
     pass
 
-
 class QueueSettingsUpdate(BaseModel):
-    current_queue_number: Optional[int] = Field(None, description="Nomor antrian yang sedang dipanggil")
-    current_referral_code: Optional[str] = Field(None, description="Kode referral dari antrean yang sedang dipanggil")
-    next_queue_counter: Optional[int] = Field(None, description="Nomor antrean berikutnya untuk pendaftaran baru")
-
+    current_queue_number: Optional[int] = Field(None, ge=0)
+    current_referral_code: Optional[str] = Field(None, max_length=10)
+    next_queue_counter: Optional[int] = Field(None, ge=1)
 
 class QueueSettingsResponse(QueueSettingsBase):
     id: str
-    created_at: datetime
-    updated_at: datetime
-
+    created_at: str
+    updated_at: str
+    
     class Config:
         from_attributes = True
