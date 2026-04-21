@@ -6,54 +6,6 @@ import uuid
 
 router = APIRouter()
 
-@router.get("/queue/status")
-def get_queue_status():
-    active_periode = get_active_periode()
-    if not active_periode:
-        raise HTTPException(status_code=404, detail="No active periode")
-    
-    periode_id = active_periode["id"]
-    settings = get_queue_settings(periode_id)
-    
-    if not settings:
-        settings = {
-            "current_queue_number": 0,
-            "current_referral_code": "",
-            "next_queue_counter": 1
-        }
-    
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM warga WHERE periode_id = ? AND status = 'serving'", (periode_id,))
-    current_serving = cursor.fetchone()
-    
-    cursor.execute("SELECT COUNT(*) as count FROM warga WHERE periode_id = ? AND status = 'waiting'", (periode_id,))
-    waiting_count = cursor.fetchone()["count"]
-    
-    cursor.execute("SELECT COUNT(*) as count FROM warga WHERE periode_id = ? AND status = 'served'", (periode_id,))
-    served_count = cursor.fetchone()["count"]
-    
-    cursor.execute("SELECT COUNT(*) as count FROM warga WHERE periode_id = ? AND status = 'pending'", (periode_id,))
-    pending_count = cursor.fetchone()["count"]
-    
-    conn.close()
-    
-    # Convert is_active from integer to boolean for consistency
-    periode_data = dict(active_periode)
-    periode_data["is_active"] = bool(periode_data["is_active"])
-    
-    return {
-        "periode": periode_data,
-        "queue_settings": settings,
-        "current_serving": dict(current_serving) if current_serving else None,
-        "statistics": {
-            "waiting": waiting_count,
-            "serving": 1 if current_serving else 0,
-            "served": served_count,
-            "pending": pending_count,
-            "total": waiting_count + (1 if current_serving else 0) + served_count + pending_count
-        }
-    }
 
 @router.post("/queue/next")
 def handle_next_queue():

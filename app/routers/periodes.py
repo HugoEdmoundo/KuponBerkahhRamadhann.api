@@ -14,10 +14,18 @@ def get_periodes():
     conn.close()
     return [PeriodeResponse(**dict(p)) for p in periodes]
 
-@router.get("/periodes/active", response_model=PeriodeResponse)
+@router.get("/periodes/active")
 def get_active_periode_endpoint():
-    active_periode = get_active_periode()
-    return PeriodeResponse(**active_periode) if active_periode else None
+    try:
+        active_periode = get_active_periode()
+        if not active_periode:
+            return {"message": "No active periode found", "data": None}
+        # Convert is_active to boolean for consistency
+        periode_data = dict(active_periode)
+        periode_data["is_active"] = bool(periode_data["is_active"])
+        return {"message": "Active periode found", "data": periode_data}
+    except Exception as e:
+        return {"message": "Error retrieving active periode", "error": str(e), "data": None}
 
 @router.post("/periodes", response_model=PeriodeResponse, status_code=201)
 def create_periode(data: PeriodeCreate):

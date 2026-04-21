@@ -33,16 +33,6 @@ def get_registrations(periodeId: Optional[str] = Query(None, description="Filter
     conn.close()
     return [WargaResponse(**dict(r)) for r in registrations]
 
-@router.get("/registrations/{registration_id}", response_model=WargaResponse)
-def get_registration(registration_id: str):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM warga WHERE id = ?", (registration_id,))
-    registration = cursor.fetchone()
-    conn.close()
-    if not registration:
-        raise HTTPException(status_code=404, detail="Registration not found")
-    return WargaResponse(**dict(registration))
 
 @router.post("/registrations", response_model=WargaResponse, status_code=201)
 def create_registration(data: WargaCreate):
