@@ -1,139 +1,114 @@
-from fastapi import APIRouter
-from ..database import get_db, get_active_periode, get_queue_settings, get_current_time
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from ..database import get_db_session, get_current_time
+from ..models.periode import Periode
 from ..schemas.periode import PeriodeCreate, PeriodeUpdate, PeriodeResponse
+from ..exceptions import NotFoundError, DatabaseError
 import uuid
 
 router = APIRouter()
 
 @router.get("/periodes", response_model=list[PeriodeResponse])
-def get_periodes():
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM periodes")
-    periodes = cursor.fetchall()
-    conn.close()
-    return [PeriodeResponse(**dict(p)) for p in periodes]
+def get_periodes(db: Session = Depends(get_db_session)):
+    try:
+        periodes = db.query(Periode).all()
+        return [PeriodeResponse.model_validate(p.__dict__) for p in periodes]
+    except Exception as e:
+        raise DatabaseError(f"Failed to retrieve periodes: {str(e)}")
 
 @router.get("/periodes/active")
-def get_active_periode_endpoint():
+def get_active_periode_endpoint(db: Session = Depends(get_db_session)):
     try:
-        active_periode = get_active_periode()
+        active_periode = db.query(Periode).filter(Periode.is_active == True).first()
         if not active_periode:
             return {"message": "No active periode found", "data": None}
-        # Convert is_active to boolean for consistency
-        periode_data = dict(active_periode)
-        periode_data["is_active"] = bool(periode_data["is_active"])
-        return {"message": "Active periode found", "data": periode_data}
+        
+        return {"message": "Active periode found", "data": PeriodeResponse.model_validate(active_periode.__dict__)}
     except Exception as e:
-        return {"message": "Error retrieving active periode", "error": str(e), "data": None}
+        raise DatabaseError(f"Failed to retrieve active periode: {str(e)}")
 
 @router.post("/periodes", response_model=PeriodeResponse, status_code=201)
-def create_periode(data: PeriodeCreate):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute("UPDATE periodes SET is_active = 0")
-    periode_id = str(uuid.uuid4())
-    now = get_current_time()
-    
-    cursor.execute('''
-        INSERT INTO periodes (id, name, is_active, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (periode_id, data.name, data.is_active, now, now))
-    
-    if data.is_active:
-        cursor.execute("SELECT id FROM queue_settings WHERE periode_id = ?", (periode_id,))
-        if not cursor.fetchone():
-            settings_id = str(uuid.uuid4())
-            cursor.execute('''
-                INSERT INTO queue_settings (id, periode_id, current_queue_number, current_referral_code, next_queue_counter, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (settings_id, periode_id, 0, '', 1, now, now))
-    
-    conn.commit()
-    conn.close()
-    
-    return PeriodeResponse(
-        id=periode_id,
-        name=data.name,
-        is_active=data.is_active,
-        created_at=now,
-        updated_at=now
-    )
+def create_periode(data: PeriodeCreate, db: Session = Depends(get_db_session)):
+    try:
+        # Deactivate all other periodes
+        db.query(Periode).filter(Periode.is_active == True).update({Periode.is_active: False})
+        
+        periode_id = str(uuid.uuid4())
+        now = get_current_time()
+        
+        new_periode = Periode(
+            id=periode_id,
+            name=data.name,
+            is_active=data.is_active,
+            created_at=now,
+            updated_at=now
+        )
+        
+        db.add(new_periode)
+        db.commit()
+        db.refresh(new_periode)
+        
+        return PeriodeResponse.model_validate(new_periode.__dict__)
+    except Exception as e:
+        raise DatabaseError(f"Failed to create periode: {str(e)}")
 
 @router.patch("/{periode_id}/activate", response_model=PeriodeResponse)
-def activate_periode(periode_id: str):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute("UPDATE periodes SET is_active = 0")
-    cursor.execute("UPDATE periodes SET is_active = 1 WHERE id = ?", (periode_id,))
-    
-    cursor.execute("SELECT id FROM queue_settings WHERE periode_id = ?", (periode_id,))
-    if not cursor.fetchone():
-        settings_id = str(uuid.uuid4())
-        now = get_current_time()
-        cursor.execute('''
-            INSERT INTO queue_settings (id, periode_id, current_queue_number, current_referral_code, next_queue_counter, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (settings_id, periode_id, 0, '', 1, now, now))
-    
-    cursor.execute("SELECT * FROM periodes WHERE id = ?", (periode_id,))
-    periode = cursor.fetchone()
-    conn.commit()
-    conn.close()
-    
-    return PeriodeResponse(**dict(periode))
+def activate_periode(periode_id: str, db: Session = Depends(get_db_session)):
+    try:
+        # Deactivate all periodes
+        db.query(Periode).filter(Periode.is_active == True).update({Periode.is_active: False})
+        
+        # Activate the specified periode
+        periode = db.query(Periode).filter(Periode.id == periode_id).first()
+        if not periode:
+            raise NotFoundError(f"Periode with id {periode_id} not found")
+        
+        periode.is_active = True
+        periode.updated_at = get_current_time()
+        
+        db.commit()
+        db.refresh(periode)
+        
+        return PeriodeResponse.model_validate(periode.__dict__)
+    except Exception as e:
+        raise DatabaseError(f"Failed to activate periode: {str(e)}")
 
 @router.patch("/{periode_id}", response_model=PeriodeResponse)
-def update_periode(periode_id: str, data: PeriodeUpdate):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    if data.is_active == True:
-        cursor.execute("UPDATE periodes SET is_active = 0")
-    
-    update_fields = []
-    update_values = []
-    
-    if data.name is not None:
-        update_fields.append("name = ?")
-        update_values.append(data.name)
-    
-    if data.is_active is not None:
-        update_fields.append("is_active = ?")
-        update_values.append(data.is_active)
-    
-    if update_fields:
-        update_fields.append("updated_at = ?")
-        update_values.append(get_current_time())
-        update_values.append(periode_id)
+def update_periode(periode_id: str, data: PeriodeUpdate, db: Session = Depends(get_db_session)):
+    try:
+        periode = db.query(Periode).filter(Periode.id == periode_id).first()
+        if not periode:
+            raise NotFoundError(f"Periode with id {periode_id} not found")
         
-        query = f"UPDATE periodes SET {', '.join(update_fields)} WHERE id = ?"
-        cursor.execute(query, update_values)
-    
-    if data.is_active == True:
-        cursor.execute("SELECT id FROM queue_settings WHERE periode_id = ?", (periode_id,))
-        if not cursor.fetchone():
-            settings_id = str(uuid.uuid4())
-            now = get_current_time()
-            cursor.execute('''
-                INSERT INTO queue_settings (id, periode_id, current_queue_number, current_referral_code, next_queue_counter, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (settings_id, periode_id, 0, '', 1, now, now))
-    
-    cursor.execute("SELECT * FROM periodes WHERE id = ?", (periode_id,))
-    periode = cursor.fetchone()
-    conn.commit()
-    conn.close()
-    
-    return PeriodeResponse(**dict(periode))
+        # If activating this periode, deactivate others first
+        if data.is_active == True:
+            db.query(Periode).filter(Periode.is_active == True).update({Periode.is_active: False})
+        
+        # Update fields
+        update_data = data.model_dump(exclude_unset=True)
+        update_data['updated_at'] = get_current_time()
+        
+        for field, value in update_data.items():
+            if hasattr(periode, field):
+                setattr(periode, field, value)
+        
+        db.commit()
+        db.refresh(periode)
+        
+        return PeriodeResponse.model_validate(periode.__dict__)
+    except Exception as e:
+        raise DatabaseError(f"Failed to update periode: {str(e)}")
 
 @router.delete("/{periode_id}")
-def delete_periode(periode_id: str):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM periodes WHERE id = ?", (periode_id,))
-    conn.commit()
-    conn.close()
-    return {"message": "Periode deleted successfully"}
+def delete_periode(periode_id: str, db: Session = Depends(get_db_session)):
+    try:
+        periode = db.query(Periode).filter(Periode.id == periode_id).first()
+        if not periode:
+            raise NotFoundError(f"Periode with id {periode_id} not found")
+        
+        db.delete(periode)
+        db.commit()
+        
+        return {"message": "Periode deleted successfully"}
+    except Exception as e:
+        raise DatabaseError(f"Failed to delete periode: {str(e)}")

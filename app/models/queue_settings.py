@@ -1,37 +1,14 @@
-from pydantic import BaseModel, Field
-from typing import Optional
-from datetime import datetime
+from sqlalchemy import Column, String, Integer, DateTime
+from ..database import Base
 
-class QueueSettingsBase(BaseModel):
-    current_queue_number: int = Field(0, ge=0)
-    current_referral_code: str = Field("", max_length=10)
-    next_queue_counter: int = Field(1, ge=1)
-    periode_id: str
-
-class QueueSettingsCreate(QueueSettingsBase):
-    pass
-
-class QueueSettingsUpdate(BaseModel):
-    current_queue_number: Optional[int] = Field(None, ge=0)
-    current_referral_code: Optional[str] = Field(None, max_length=10)
-    next_queue_counter: Optional[int] = Field(None, ge=1)
-
-class QueueSettingsResponse(QueueSettingsBase):
-    id: str
-    created_at: str
-    updated_at: str
+# SQLAlchemy Base Model - represents database table
+class QueueSettings(Base):
+    __tablename__ = 'queue_settings'
     
-    class Config:
-        from_attributes = True
-
-class QueueSettings(BaseModel):
-    id: str
-    current_queue_number: int
-    current_referral_code: str
-    next_queue_counter: int
-    periode_id: str
-    created_at: str
-    updated_at: str
-    
-    class Config:
-        from_attributes = True
+    id = Column(String, primary_key=True)
+    current_queue_number = Column(Integer, nullable=False, default=0)
+    current_referral_code = Column(String, nullable=False, default="")
+    next_queue_counter = Column(Integer, nullable=False, default=1)
+    periode_id = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)

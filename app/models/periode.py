@@ -1,32 +1,12 @@
-from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime
+from sqlalchemy import Column, String, Boolean, DateTime
+from ..database import Base
 
-class PeriodeBase(BaseModel):
-    name: str
-    is_active: bool = False
-
-class PeriodeCreate(PeriodeBase):
-    pass
-
-class PeriodeUpdate(BaseModel):
-    name: Optional[str] = None
-    is_active: Optional[bool] = None
-
-class PeriodeResponse(PeriodeBase):
-    id: str
-    created_at: str
-    updated_at: str
+# SQLAlchemy Base Model - represents database table
+class Periode(Base):
+    __tablename__ = 'periodes'
     
-    class Config:
-        from_attributes = True
-
-class Periode(BaseModel):
-    id: str
-    name: str
-    is_active: bool
-    created_at: str
-    updated_at: str
-    
-    class Config:
-        from_attributes = True
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    is_active = Column(Boolean, default=False)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
