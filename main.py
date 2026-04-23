@@ -17,7 +17,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
 app.include_router(periodes.router, prefix="/api", tags=["periodes"])
 app.include_router(registrations.router, prefix="/api", tags=["registrations"])
 app.include_router(queue_settings.router, prefix="/api", tags=["queue-settings"])
-app.include_router(queue_router, prefix="/api", tags=["queue-operations"])
+app.include_router(queue_router, prefix="/api")
 
 app.add_exception_handler(QueueAPIException, queue_exception_handler)
 

@@ -99,6 +99,8 @@ def handle_next_queue(db: Session = Depends(get_db_session)):
     except Exception as e:
         db.rollback()
         raise DatabaseError(f"Failed to advance queue: {str(e)}")
+    finally:
+        db.close()
 
 
 @router.post("/pending", response_model=dict)
@@ -177,6 +179,8 @@ def handle_pending_queue(db: Session = Depends(get_db_session)):
     except Exception as e:
         db.rollback()
         raise DatabaseError(f"Failed to handle pending queue: {str(e)}")
+    finally:
+        db.close()
 
 
 @router.post("/back", response_model=dict)
@@ -198,7 +202,34 @@ def handle_back_queue(db: Session = Depends(get_db_session)):
         ).first()
         
         if not current_serving:
-            raise NotFoundError("No current serving to go back")
+            # raise NotFoundError("No current serving to go back")
+            if not current_serving:
+                last_served = db.query(Warga).filter(
+                    Warga.periode_id == periode.id,
+                    Warga.status == "served"
+                ).order_by(Warga.queue_number.desc()).first()
+
+                if last_served:
+                    last_served.status = "serving"
+                    queue_settings.current_queue_number = last_served.queue_number
+                    queue_settings.current_referral_code = last_served.referral_code
+                    db.commit()
+                    return {
+                        "message": "Queue back operation successful (fallback)",
+                        "current_serving": {
+                            "id": str(last_served.id),
+                            "name": last_served.name,
+                            "queue_number": last_served.queue_number,
+                            "referral_code": last_served.referral_code
+                        },
+                        "previous_serving": None
+                    }
+                else:
+                    return {
+                        "message": "No queue available to back",
+                        "data": None
+                    }
+
         
         # Mark current serving as waiting
         current_serving.status = "waiting"
@@ -256,69 +287,73 @@ def handle_back_queue(db: Session = Depends(get_db_session)):
     except Exception as e:
         db.rollback()
         raise DatabaseError(f"Failed to handle back queue: {str(e)}")
+    finally:
+        db.close()
 
 
 @router.get("/status", response_model=dict)
 def get_queue_status(db: Session = Depends(get_db_session)):
     """Get current queue status"""
-    periode = get_active_periode(db)
-    
     try:
-        queue_settings = get_queue_settings_for_periode(periode.id, db)
-    except NotFoundError:
+        periode = get_active_periode(db)
+        
+        try:
+            queue_settings = get_queue_settings_for_periode(periode.id, db)
+        except NotFoundError:
+            return {
+                "message": "No queue settings found for active periode",
+                "data": None
+            }
+        
+        # Get current serving
+        current_serving = db.query(Warga).filter(
+            Warga.periode_id == periode.id,
+            Warga.status == "serving"
+        ).first()
+        
+        # Get queue counts
+        waiting_count = db.query(Warga).filter(
+            Warga.periode_id == periode.id,
+            Warga.status == "waiting"
+        ).count()
+        
+        served_count = db.query(Warga).filter(
+            Warga.periode_id == periode.id,
+            Warga.status == "served"
+        ).count()
+        
+        pending_count = db.query(Warga).filter(
+            Warga.periode_id == periode.id,
+            Warga.status == "pending"
+        ).count()
+        
         return {
-            "message": "No queue settings found for active periode",
-            "data": None
+            "periode": {
+                "id": str(periode.id),
+                "name": periode.name
+            },
+            "queue_settings": {
+                "current_queue_number": queue_settings.current_queue_number,
+                "current_referral_code": queue_settings.current_referral_code,
+                "next_queue_counter": queue_settings.next_queue_counter
+            },
+            "current_serving": {
+                "id": str(current_serving.id) if current_serving else None,
+                "name": current_serving.name if current_serving else None,
+                "queue_number": current_serving.queue_number if current_serving else None,
+                "referral_code": current_serving.referral_code if current_serving else None
+            },
+            "statistics": {
+                "waiting": waiting_count,
+                "serving": 1 if current_serving else 0,
+                "served": served_count,
+                "pending": pending_count,
+                "total": waiting_count + (1 if current_serving else 0) + served_count + pending_count
+            }
         }
-    else:
-        queue_settings = QueueSettings(periode_id=periode.id)
-        db.add(queue_settings)
-        db.commit()
-        db.refresh(queue_settings)
-    
-    # Get current serving
-    current_serving = db.query(Warga).filter(
-        Warga.periode_id == periode.id,
-        Warga.status == "serving"
-    ).first()
-    
-    # Get queue counts
-    waiting_count = db.query(Warga).filter(
-        Warga.periode_id == periode.id,
-        Warga.status == "waiting"
-    ).count()
-    
-    served_count = db.query(Warga).filter(
-        Warga.periode_id == periode.id,
-        Warga.status == "served"
-    ).count()
-    
-    pending_count = db.query(Warga).filter(
-        Warga.periode_id == periode.id,
-        Warga.status == "pending"
-    ).count()
-    
-    return {
-        "periode": {
-            "id": str(periode.id),
-            "name": periode.name
-        },
-        "queue_settings": {
-            "current_queue_number": queue_settings.current_queue_number,
-            "current_referral_code": queue_settings.current_referral_code,
-            "next_queue_counter": queue_settings.next_queue_counter
-        },
-        "current_serving": {
-            "id": str(current_serving.id) if current_serving else None,
-            "name": current_serving.name if current_serving else None,
-            "queue_number": current_serving.queue_number if current_serving else None,
-            "referral_code": current_serving.referral_code if current_serving else None
-        },
-        "statistics": {
-            "waiting": waiting_count,
-            "serving": 1 if current_serving else 0,
-            "served": served_count,
-            "pending": pending_count,
-            "total": waiting_count + (1 if current_serving else 0) + served_count + pending_count
-        }
-    }
+    except (NotFoundError, BadRequestError):
+        raise
+    except Exception as e:
+        raise DatabaseError(f"Failed to get queue status: {str(e)}")
+    finally:
+        db.close()

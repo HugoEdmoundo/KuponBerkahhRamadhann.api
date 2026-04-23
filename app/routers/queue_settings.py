@@ -7,10 +7,10 @@ from ..models.periode import Periode
 from ..exceptions import NotFoundError, DatabaseError
 import uuid
 
-router = APIRouter()
+router = APIRouter(prefix="/queue-settings")
 
 
-@router.get("/queue-settings/periode/{periode_id}", response_model=QueueSettingsResponse)
+@router.get("/periode/{periode_id}", response_model=QueueSettingsResponse)
 def get_queue_settings_by_periode(periode_id: str, db: Session = Depends(get_db_session)):
     try:
         settings = db.query(QueueSettings).filter(QueueSettings.periode_id == periode_id).first()
@@ -21,9 +21,11 @@ def get_queue_settings_by_periode(periode_id: str, db: Session = Depends(get_db_
         raise
     except Exception as e:
         raise DatabaseError(f"Failed to retrieve queue settings: {str(e)}")
+    finally:
+        db.close()
 
 
-@router.post("/queue-settings", response_model=QueueSettingsResponse, status_code=201)
+@router.post("", response_model=QueueSettingsResponse, status_code=201)
 def create_queue_settings(data: QueueSettingsCreate, db: Session = Depends(get_db_session)):
     try:
         # Check if periode exists
@@ -60,3 +62,5 @@ def create_queue_settings(data: QueueSettingsCreate, db: Session = Depends(get_d
         raise
     except Exception as e:
         raise DatabaseError(f"Failed to create queue settings: {str(e)}")
+    finally:
+        db.close()

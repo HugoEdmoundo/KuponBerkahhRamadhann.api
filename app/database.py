@@ -23,8 +23,15 @@ def get_current_time():
     """Get current datetime as Python datetime object"""
     return datetime.now(pytz.timezone('Asia/Jakarta'))
 
-# SQLAlchemy setup
-engine = create_engine('sqlite:///queue.db')
+# SQLAlchemy setup with connection pool settings
+engine = create_engine(
+    'sqlite:///queue.db',
+    pool_size=10,
+    max_overflow=20,
+    pool_timeout=30,
+    pool_recycle=3600,
+    echo=False
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

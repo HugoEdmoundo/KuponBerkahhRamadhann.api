@@ -15,6 +15,8 @@ def get_periodes(db: Session = Depends(get_db_session)):
         return [PeriodeResponse.model_validate(p.__dict__) for p in periodes]
     except Exception as e:
         raise DatabaseError(f"Failed to retrieve periodes: {str(e)}")
+    finally:
+        db.close()
 
 @router.get("/periodes/active")
 def get_active_periode_endpoint(db: Session = Depends(get_db_session)):
@@ -26,6 +28,8 @@ def get_active_periode_endpoint(db: Session = Depends(get_db_session)):
         return {"message": "Active periode found", "data": PeriodeResponse.model_validate(active_periode.__dict__)}
     except Exception as e:
         raise DatabaseError(f"Failed to retrieve active periode: {str(e)}")
+    finally:
+        db.close()
 
 @router.post("/periodes", response_model=PeriodeResponse, status_code=201)
 def create_periode(data: PeriodeCreate, db: Session = Depends(get_db_session)):
@@ -51,8 +55,10 @@ def create_periode(data: PeriodeCreate, db: Session = Depends(get_db_session)):
         return PeriodeResponse.model_validate(new_periode.__dict__)
     except Exception as e:
         raise DatabaseError(f"Failed to create periode: {str(e)}")
+    finally:
+        db.close()
 
-@router.patch("/{periode_id}/activate", response_model=PeriodeResponse)
+@router.patch("/periodes/{periode_id}/activate", response_model=PeriodeResponse)
 def activate_periode(periode_id: str, db: Session = Depends(get_db_session)):
     try:
         # Deactivate all periodes
@@ -72,6 +78,8 @@ def activate_periode(periode_id: str, db: Session = Depends(get_db_session)):
         return PeriodeResponse.model_validate(periode.__dict__)
     except Exception as e:
         raise DatabaseError(f"Failed to activate periode: {str(e)}")
+    finally:
+        db.close()
 
 @router.patch("/{periode_id}", response_model=PeriodeResponse)
 def update_periode(periode_id: str, data: PeriodeUpdate, db: Session = Depends(get_db_session)):
@@ -98,6 +106,8 @@ def update_periode(periode_id: str, data: PeriodeUpdate, db: Session = Depends(g
         return PeriodeResponse.model_validate(periode.__dict__)
     except Exception as e:
         raise DatabaseError(f"Failed to update periode: {str(e)}")
+    finally:
+        db.close()
 
 @router.delete("/{periode_id}")
 def delete_periode(periode_id: str, db: Session = Depends(get_db_session)):
@@ -112,3 +122,5 @@ def delete_periode(periode_id: str, db: Session = Depends(get_db_session)):
         return {"message": "Periode deleted successfully"}
     except Exception as e:
         raise DatabaseError(f"Failed to delete periode: {str(e)}")
+    finally:
+        db.close()

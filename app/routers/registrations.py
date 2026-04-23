@@ -32,6 +32,8 @@ def get_registrations(
         return [WargaResponse.model_validate(r.__dict__) for r in registrations]
     except Exception as e:
         raise DatabaseError(f"Failed to retrieve registrations: {str(e)}")
+    finally:
+        db.close()
 
 @router.post("/registrations", response_model=WargaResponse, status_code=201)
 def create_registration(data: WargaCreate, db: Session = Depends(get_db_session)):
@@ -106,6 +108,8 @@ def create_registration(data: WargaCreate, db: Session = Depends(get_db_session)
         raise
     except Exception as e:
         raise DatabaseError(f"Failed to create registration: {str(e)}")
+    finally:
+        db.close()
 
 @router.patch("/registrations/{registration_id}", response_model=WargaResponse)
 def update_registration(registration_id: str, data: WargaUpdate, db: Session = Depends(get_db_session)):
@@ -131,6 +135,8 @@ def update_registration(registration_id: str, data: WargaUpdate, db: Session = D
         return WargaResponse.model_validate(registration.__dict__)
     except Exception as e:
         raise DatabaseError(f"Failed to update registration: {str(e)}")
+    finally:
+        db.close()
 
 @router.delete("/registrations/{registration_id}")
 def delete_registration(registration_id: str, db: Session = Depends(get_db_session)):
@@ -145,3 +151,5 @@ def delete_registration(registration_id: str, db: Session = Depends(get_db_sessi
         return {"message": "Registration deleted successfully"}
     except Exception as e:
         raise DatabaseError(f"Failed to delete registration: {str(e)}")
+    finally:
+        db.close()
